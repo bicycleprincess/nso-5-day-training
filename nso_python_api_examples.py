@@ -1,5 +1,6 @@
 import ncs
 import socket
+import textfsm
 """
 This File provides servel functions that give example sof executing common tasks using the NSO Maagic API
 These a written for use on a local NSO instance and are intended to be used for demonstration purposes.
@@ -88,11 +89,14 @@ def add_device(device_name):
     Third Transaction: Gets ssh keys, syncs-from and southbound-locks the device.
     """
     ip_addr = socket.getaddrinfo(device_name,0,0,0,0)
+    # First Transaction: Adds the device and IP to add the device into the cDB
     with ncs.maapi.single_write_trans('admin', 'python', groups=['ncsadmin']) as t:
         root = ncs.maagic.get_root(t)
         root.devices.device.create(device_name)
         root.devices.device[device_name].address = ip_addr[0][4][0]
         t.apply()
+
+    # Second Transaction: adds the port and creates the device-type/ NED info and unlocks the device.
     with ncs.maapi.single_write_trans('admin', 'python', groups=['ncsadmin']) as t2:
         root = ncs.maagic.get_root(t2)
         root.devices.device[device_name].port = 22
@@ -102,6 +106,8 @@ def add_device(device_name):
         root.devices.device[device_name].authgroup = "branblac"
         root.devices.device[device_name].state.admin_state = "unlocked"
         t2.apply()
+
+    # Third Transaction: Gets ssh keys, syncs-from and southbound-locks the device.
     with ncs.maapi.single_write_trans('admin', 'python', groups=['ncsadmin']) as t3:
         root = ncs.maagic.get_root(t3)
         root.devices.device[device_name].ssh.fetch_host_keys()
@@ -143,7 +149,7 @@ def show_commands(command, device_name):
     4. Pass the command function input into the input objects args variable
     5. Invoke the command by passign the input object into the device.live_status.ios_stats__exec.show() method
     6. set the output variable to the result attributw of our invoked command object above
-    7.Print the output
+    7. Print the output
     """
     with ncs.maapi.Maapi() as m:
        with ncs.maapi.Session(m, 'admin', 'python'):
@@ -235,7 +241,7 @@ def print_interfaces(device_name, interface_type):
 # https://github.com/networktocode/ntc-templates/tree/master/templates
     # username = 'ncsadmin'
     # context = 'python'
-def show_command_parsed_with_fsm_template (username, context,devicename,showx,templatefile):
+def show_command_parsed_with_fsm_template (username, context, devicename, showx, templatefile):
 
     try:
         with ncs.maapi.single_read_trans(username, context, [username]) as t:
@@ -246,7 +252,7 @@ def show_command_parsed_with_fsm_template (username, context,devicename,showx,te
             showcommand = device.live_status.ios_stats__exec.show(input1).result
             print showcommand
 
-    except :
+    except Exception:
         print "This device is not reachable"
         return 1
 
@@ -254,8 +260,8 @@ def show_command_parsed_with_fsm_template (username, context,devicename,showx,te
     template = open(filename)
     fsm = textfsm.TextFSM(template)
     fsm_results = fsm.ParseText(showcommand)
-    print "fsm results"
-    print fsm_results
+    print("fsm results")
+    print(fsm_results)
     return fsm_results
 
 #Take FSM results and output to CSV
@@ -282,8 +288,8 @@ def getdevicelist(username, context,devicekeyword,devicehw):
         for device in devicelist:
             devicename = device.name
             hardwaretype = root.devices.device[devicename].config.ios__cached_show.version.model
-            print hardwaretype
-            print devicename
+            print(hardwaretype)
+            print(devicename)
             try:
                 if devicekeyword in devicename and devicehw in hardwaretype:
                     result.append(devicename)
